@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -35,6 +36,7 @@ _ADAPTER_MODEL_KWARG_KEYS = {
     "project",
     "client_kwargs",
     "drop_params",
+    "log_raw_requests",
     "input_cost_per_token",
     "output_cost_per_token",
     "cached_input_cost_per_token",
@@ -55,6 +57,7 @@ class OpenAIResponsesCoTModelConfig(LitellmModelConfig):
     organization: str | None = None
     project: str | None = None
     client_kwargs: dict[str, Any] = Field(default_factory=dict)
+    log_raw_requests: bool = False
     input_cost_per_token: float | None = None
     output_cost_per_token: float | None = None
     cached_input_cost_per_token: float | None = None
@@ -122,6 +125,10 @@ class OpenAIResponsesCoTModel(LitellmModel):
         if isinstance(response, dict):
             return dict(response)
         return dict(response)
+
+    @staticmethod
+    def _jsonable(value: Any) -> Any:
+        return json.loads(json.dumps(value, default=str))
 
     @staticmethod
     def _strip_extra(value: Any) -> Any:
@@ -196,8 +203,15 @@ class OpenAIResponsesCoTModel(LitellmModel):
 
         return request_kwargs
 
-    def _query(self, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
-        request_kwargs = self._build_request_kwargs(messages, **kwargs)
+    def _raw_request_for_log(self, request_kwargs: Mapping[str, Any]) -> dict[str, Any]:
+        return self._jsonable(dict(request_kwargs))
+
+    def _log_raw_request(self, request_log: Mapping[str, Any]) -> None:
+        if self._setting("log_raw_requests"):
+            logger.warning("OpenAI Responses API raw request: %s", json.dumps(request_log, sort_keys=True))
+
+    def _query(self, request_kwargs: Mapping[str, Any], request_log: Mapping[str, Any]) -> Any:
+        self._log_raw_request(request_log)
         try:
             return self._client.responses.create(**request_kwargs)
         except AuthenticationError as e:
@@ -209,7 +223,9 @@ class OpenAIResponsesCoTModel(LitellmModel):
         for attempt in retry(logger=logger, abort_exceptions=self.abort_exceptions):
             with attempt:
                 request_previous_id = self._previous_response_id
-                response = self._query(input_messages, **kwargs)
+                request_kwargs = self._build_request_kwargs(input_messages, **kwargs)
+                request_log = self._raw_request_for_log(request_kwargs)
+                response = self._query(request_kwargs, request_log)
                 response_dict = self._dump_response(response)
                 response_id = response_dict.get("id")
                 if not response_id:
@@ -222,19 +238,34 @@ class OpenAIResponsesCoTModel(LitellmModel):
                 except FormatError as e:
                     self._remember_response(response_id)
                     try:
-                        e.messages[0]["extra"]["response"] = response_dict
+                        extra = e.messages[0].setdefault("extra", {})
+                        extra["response"] = response_dict
+                        extra["openai_cot"] = {
+                            "request": request_log,
+                            "request_previous_response_id": request_previous_id,
+                            "response_id": response_id,
+                        }
                     except Exception:
-                        e.messages[0]["extra"] = {"response": repr(response)}
+                        e.messages[0]["extra"] = {
+                            "response": repr(response),
+                            "openai_cot": {
+                                "request": request_log,
+                                "request_previous_response_id": request_previous_id,
+                                "response_id": response_id,
+                            },
+                        }
                     raise
 
                 self._remember_response(response_id)
                 message = response_dict
+                response_extra = dict(response_dict)
                 message["extra"] = {
                     "actions": actions,
-                    "response": response_dict,
+                    "response": response_extra,
                     **cost_output,
                     "timestamp": time.time(),
                     "openai_cot": {
+                        "request": request_log,
                         "request_previous_response_id": request_previous_id,
                         "response_id": response_id,
                     },

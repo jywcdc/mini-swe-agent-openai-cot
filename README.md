@@ -32,6 +32,7 @@ agents:
         reasoning:
           effort: xhigh
           summary: auto
+        log_raw_requests: true
 ```
 
 Any normal Responses API parameter that is not owned by the adapter can go under
@@ -70,3 +71,8 @@ You should see:
 - Later response objects with `previous_response_id` set.
 - Reasoning output items containing `encrypted_content` when the API returns it.
 - Prior response output items present again in later request inputs.
+- The exact Responses API request kwargs under `extra.openai_cot.request`.
+
+If `log_raw_requests: true` is set, the same request kwargs are also written to
+`agent/mini-swe-agent.txt` before each API call. These logs include prompts and
+encrypted reasoning items, so treat rollout artifacts as sensitive.
