@@ -4,9 +4,8 @@ Stateful OpenAI Responses API model adapter for `mini-swe-agent`.
 
 The built-in `litellm_response` model flattens previous Responses API outputs
 back into the next request but does not also set `previous_response_id`. This
-adapter stores the last OpenAI response ID and uses that stored chain for later
-turns instead of replaying mini-swe-agent's accumulated local history. It always
-sends:
+adapter stores the last OpenAI response ID and sends every turn with the full
+Responses API history plus `previous_response_id`. It always sends:
 
 ```python
 reasoning={"context": "all_turns"}
@@ -47,9 +46,9 @@ a dependency, so installing the adapter will not upgrade or replace the runner.
 
 On the first call the adapter sends the full initial mini-swe-agent input. After
 OpenAI returns `resp_...`, the adapter stores that ID. On later calls, the
-adapter sets `previous_response_id` and does not replay prior response output
-items, original system/user messages, or accumulated `function_call_output`
-items:
+adapter passes new local input/tool-output items and omits prior stored response
+output items, because `previous_response_id` already gives the server that stored
+response chain:
 
 ```python
 previous_response_id="resp_..."
@@ -58,7 +57,9 @@ previous_response_id="resp_..."
 This matches the pattern:
 
 ```python
-client.responses.create(previous_response_id=response.id, input=[], ...)
+history.extend(item.model_dump(exclude_none=True) for item in response.output)
+next_input = [item for item in history if item["type"] == "function_call_output"]
+client.responses.create(previous_response_id=response.id, input=next_input, ...)
 ```
 
 Both first and later calls use `reasoning.context="all_turns"`.
@@ -71,8 +72,7 @@ You should see:
 - OpenAI response objects with `id: resp_...`.
 - Later response objects with `previous_response_id` set.
 - Reasoning output items containing `encrypted_content` when the API returns it.
-- Prior stored response output items and `function_call_output` items omitted
-  from later request inputs.
+- Prior stored response output items omitted from later request inputs.
 - The exact Responses API request kwargs under `extra.openai_cot.request`.
 
 If `log_raw_requests: true` is set, the same request kwargs are also written to

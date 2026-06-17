@@ -69,9 +69,7 @@ class OpenAIResponsesCoTModel(LitellmModel):
 
     mini-swe-agent gives every model call the full local trajectory. This adapter
     preserves that full Responses API input while also setting
-    ``previous_response_id`` after the first OpenAI response. Once a response
-    is stored, the adapter relies on OpenAI's stored response chain instead of
-    replaying mini-swe-agent's accumulated local history.
+    ``previous_response_id`` after the first OpenAI response.
     """
 
     abort_exceptions = [
@@ -147,6 +145,8 @@ class OpenAIResponsesCoTModel(LitellmModel):
     def _prepare_messages_for_api(
         self,
         messages: list[dict[str, Any]],
+        *,
+        include_stored_responses: bool = True,
     ) -> list[dict[str, Any]]:
         """Remove mini-swe-agent metadata and flatten response objects if needed."""
         prepared: list[dict[str, Any]] = []
@@ -154,6 +154,8 @@ class OpenAIResponsesCoTModel(LitellmModel):
             if message.get("role") == "exit":
                 continue
             if message.get("object") == "response":
+                if not include_stored_responses:
+                    continue
                 for item in message.get("output") or []:
                     if isinstance(item, dict):
                         prepared.append(self._strip_extra(item))
@@ -162,9 +164,10 @@ class OpenAIResponsesCoTModel(LitellmModel):
         return prepared
 
     def _input_for_request(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        if self._previous_response_id is not None:
-            return []
-        return self._prepare_messages_for_api(messages)
+        return self._prepare_messages_for_api(
+            messages,
+            include_stored_responses=self._previous_response_id is None,
+        )
 
     def _reasoning_for_request(self, raw_kwargs: Mapping[str, Any]) -> Any:
         reasoning = raw_kwargs.get("reasoning") or {}
