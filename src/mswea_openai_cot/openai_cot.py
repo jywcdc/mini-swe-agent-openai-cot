@@ -196,7 +196,7 @@ class OpenAIResponsesCoTModel(LitellmModel):
                 "input": input_messages,
                 "tools": [BASH_TOOL_RESPONSE_API],
                 "include": ["reasoning.encrypted_content"],
-                "store": False,
+                "store": True,
             }
         )
 

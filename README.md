@@ -10,7 +10,7 @@ Responses API history plus `previous_response_id`. It always sends:
 ```python
 reasoning={"context": "all_turns"}
 include=["reasoning.encrypted_content"]
-store=False
+store=True
 ```
 
 ## Pier config
