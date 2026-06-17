@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mini-swe-agent-openai-cot"
+version = "0.1.0"
+description = "Stateful OpenAI Responses API model adapter for mini-swe-agent"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Datacurve" }]
+dependencies = [
+  "openai>=2.41.0",
+  "pydantic>=2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mswea_openai_cot"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

@@ -1,0 +1,14 @@
+agents:
+  - name: mini-swe-agent
+    model_name: openai/kindle-alpha-api
+    env:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    kwargs:
+      model_class: mswea_openai_cot.KindleStatefulResponsesModel
+      extra_python_packages:
+        - "mini-swe-agent-openai-cot @ git+https://github.com/YOUR_ORG/mini-swe-agent-openai-cot.git@PINNED_SHA"
+      model_kwargs:
+        api_model_name: kindle-alpha-api
+        reasoning:
+          effort: xhigh
+          summary: auto
