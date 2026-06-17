@@ -121,9 +121,9 @@ class OpenAIResponsesCoTModel(LitellmModel):
     @staticmethod
     def _dump_response(response: Any) -> dict[str, Any]:
         if hasattr(response, "model_dump"):
-            return response.model_dump(mode="json")
+            return response.model_dump(mode="json", exclude_none=True)
         if isinstance(response, dict):
-            return dict(response)
+            return {k: v for k, v in response.items() if v is not None}
         return dict(response)
 
     @staticmethod
@@ -133,7 +133,11 @@ class OpenAIResponsesCoTModel(LitellmModel):
     @staticmethod
     def _strip_extra(value: Any) -> Any:
         if isinstance(value, dict):
-            return {k: OpenAIResponsesCoTModel._strip_extra(v) for k, v in value.items() if k != "extra"}
+            return {
+                k: OpenAIResponsesCoTModel._strip_extra(v)
+                for k, v in value.items()
+                if k != "extra" and v is not None
+            }
         if isinstance(value, list):
             return [OpenAIResponsesCoTModel._strip_extra(v) for v in value]
         return value
