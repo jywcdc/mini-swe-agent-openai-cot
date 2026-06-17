@@ -46,8 +46,9 @@ a dependency, so installing the adapter will not upgrade or replace the runner.
 
 On the first call the adapter sends the full initial mini-swe-agent input. After
 OpenAI returns `resp_...`, the adapter stores that ID. On later calls, the
-adapter still sends the full local trajectory, including prior response output
-items, and also passes:
+adapter passes new local input/tool-output items and omits prior stored response
+output items, because `previous_response_id` already gives the server that stored
+response chain:
 
 ```python
 previous_response_id="resp_..."
@@ -57,7 +58,8 @@ This matches the pattern:
 
 ```python
 history.extend(item.model_dump(exclude_none=True) for item in response.output)
-client.responses.create(previous_response_id=response.id, input=history, ...)
+next_input = [item for item in history if item["type"] == "function_call_output"]
+client.responses.create(previous_response_id=response.id, input=next_input, ...)
 ```
 
 Both first and later calls use `reasoning.context="all_turns"`.
@@ -70,7 +72,7 @@ You should see:
 - OpenAI response objects with `id: resp_...`.
 - Later response objects with `previous_response_id` set.
 - Reasoning output items containing `encrypted_content` when the API returns it.
-- Prior response output items present again in later request inputs.
+- Prior stored response output items omitted from later request inputs.
 - The exact Responses API request kwargs under `extra.openai_cot.request`.
 
 If `log_raw_requests: true` is set, the same request kwargs are also written to
