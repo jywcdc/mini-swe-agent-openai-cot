@@ -34,6 +34,7 @@ _ADAPTER_MODEL_KWARG_KEYS = {
     "organization",
     "project",
     "client_kwargs",
+    "drop_params",
     "input_cost_per_token",
     "output_cost_per_token",
     "cached_input_cost_per_token",
